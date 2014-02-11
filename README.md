@@ -1,5 +1,5 @@
 #knife-psearch
-*Partitial search plugin for knife with support for grouping matches based on attributes.*
+*Partial search plugin for knife with support for grouping matches based on attributes.*
 
 ##Example searches
 
@@ -14,7 +14,7 @@
 
   `knife psearch node "name:*" -g languages.php.version -n`
 
-###Standard partitial searches
+###Standard Partial searches
 
 By default psearch will return the node name on all searches.
 You can specify additional attributes to include with the -a flag.
@@ -26,4 +26,4 @@ Multiple attributes is separated by a comma.
 
 ##Installation
 
-Copy psearch.rb, partitial_search.rb to $HOME/.chef/plugins
+Copy psearch.rb, partial_search.rb to $HOME/.chef/plugins
