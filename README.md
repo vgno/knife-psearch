@@ -8,11 +8,13 @@ Partial search only returns the the part of the json objects you specify instead
 
 201 nodes:
 
-  time knife search node 'name:\*' -a languages.php.version
-  real	0m13.881s
+```
+$ time knife search node 'name:\*' -a languages.php.version
+real 0m13.881s
 
-  time knife psearch node 'name:\*' -a languages.php.version
-  real	0m3.592s
+$ time knife psearch node 'name:\*' -a languages.php.version
+real	0m3.592s
+```
 
 In addition psearch has a group functionalty that enables you to group host by some attribute.
 
