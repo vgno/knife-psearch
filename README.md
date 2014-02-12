@@ -1,6 +1,25 @@
 #knife-psearch
 *Partial search plugin for knife with support for grouping matches based on attributes.*
 
+## Introduction
+
+Partial search only returns the the part of the json objects you specify instead of returning the complete objecttree and filter client side as the original search plugin does. This makes searching much much faster for large data.
+**partial_search.rb** is copied from the partial_search cookbook from opscode.
+
+201 nodes:
+
+  time knife search node 'name:\*' -a languages.php.version
+  real	0m13.881s
+
+  time knife psearch node 'name:\*' -a languages.php.version
+  real	0m3.592s
+
+In addition psearch has a group functionalty that enables you to group host by some attribute.
+
+## Requirements
+
+Psearch uses the new partial search api included in chef-server 11. 
+
 ##Example searches
 
 ###Search and group results
