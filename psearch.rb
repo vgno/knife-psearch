@@ -50,6 +50,12 @@ class Psearch < Chef::Knife
   :long => "--nomatch",
   :description => "Also print nodes that doesn't match you attribute group.",
   :default => false
+
+  option :quiet,
+  :short => "-q",
+  :long => "--quiet",
+  :description => "Do not print empty attributes.",
+  :default => false
  
   def run
     @index, @search = @name_args
@@ -82,7 +88,7 @@ class Psearch < Chef::Knife
       attrVal = item[attrName]
       nodeName = item['name']
 
-      if (attrVal.nil?)
+      if attrVal.nil?
         cnt_noMatch += 1
         noMatch << nodeName
         next
@@ -90,12 +96,17 @@ class Psearch < Chef::Knife
 
       cnt_matches += 1
 
-      if (config[:attribute])
+      if config[:attribute]
         # Generate a hash with all attributes included in search.
         itemAttributes = Hash.new
 
         item.each do |itemAttr|
-          if (itemAttr.first != attrName && itemAttr.first != "name")
+          if itemAttr.first != attrName && itemAttr.first != "name"
+
+            if config[:quiet] && itemAttr[1].nil?
+              next
+            end
+
             itemAttributes[itemAttr[0]] = itemAttr[1]
           end
         end 
@@ -122,7 +133,7 @@ class Psearch < Chef::Knife
       ui.msg("\n")
     end
 
-    if (config[:no_match] && noMatch.size > 0)
+    if config[:no_match] && noMatch.size > 0
       ui.msg "Non matching nodes: "
       noMatch.each do |nm|
         ui.msg nm
@@ -134,11 +145,11 @@ end
   def build_key_hash
     key_hash = {}
 
-    if (config[:group])
+    if config[:group]
       key_hash[config[:group]] = config[:group].split(".")
     end
 
-    if (config[:attribute])
+    if config[:attribute]
       specs = config[:attribute].split(',')
 
       specs.each do |spc|
