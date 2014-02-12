@@ -59,24 +59,17 @@ class Psearch < Chef::Knife
     args_hash[:start] = config[:start]
     args_hash[:rows] = config[:rows]
     
-    if (config[:group])
-      
-      results = Chef::PartialSearch.new.search(@index, @search, 
-        :keys => { 
-        config[:group] => config[:group].split("."),
-        'name' => ['name']
-        })
+    results = Chef::PartialSearch.new.search(@index, @search, args_hash)
 
+    if (config[:group])
       groupOutput(results.first)
     else
-      results = Chef::PartialSearch.new.search(@index, @search, args_hash)
       output results.first
     end
   
   end
 
   def groupOutput(itemList)
-
     attrName = config[:group]
 
     matches = Hash.new {|h,k| h[k] = [] }
@@ -96,16 +89,36 @@ class Psearch < Chef::Knife
       end
 
       cnt_matches += 1
-      matches[attrVal] << nodeName
+
+      if (config[:attribute])
+        # Generate a hash with all attributes included in search.
+        itemAttributes = Hash.new
+
+        item.each do |itemAttr|
+          if (itemAttr.first != attrName && itemAttr.first != "name")
+            itemAttributes[itemAttr[0]] = itemAttr[1]
+          end
+        end 
+
+        matches[attrVal] << { nodeName => itemAttributes }
+      else
+        matches[attrVal] << nodeName
+      end
     end
 
     ui.msg("Found #{cnt_matches} nodes with #{attrName} attribute set.\n")
     (config[:no_match] && cnt_noMatch > 0) ? ui.msg("Found #{cnt_noMatch} non-matching nodes.\n") : ""
-
     ui.msg("\n")
 
     matches.each do |nn|
-      output nn
+      element = Hash.new
+
+      title = "#{nn.first} (#{nn[1].size} node"
+      title += nn[1].size > 1 ? "s)" : ")"
+      element[title] = nn
+      element[title].delete_at(0)
+
+      output element
       ui.msg("\n")
     end
 
@@ -120,6 +133,10 @@ end
  
   def build_key_hash
     key_hash = {}
+
+    if (config[:group])
+      key_hash[config[:group]] = config[:group].split(".")
+    end
 
     if (config[:attribute])
       specs = config[:attribute].split(',')
