@@ -9,10 +9,8 @@ class Psearch < Chef::Knife
   banner "knife psearch INDEX SEARCH (Optional: -a attributes)"
  
   deps do
-    # Note, this requires the partial_search.rb library currently
-    # only available in the partial search cookbook
-    # https://github.com/opscode/partial_search
     require File.join(File.dirname(__FILE__), 'partial_search.rb')
+    require 'csv'
   end
  
   option :sort,
@@ -48,7 +46,7 @@ class Psearch < Chef::Knife
   option :no_match,
   :short => "-n",
   :long => "--nomatch",
-  :description => "Also print nodes that doesn't match you attribute group.",
+  :description => "When using -g do not list nodes that does not have the attribute you are grouping on set.",
   :default => false
 
   option :quiet,
@@ -56,6 +54,12 @@ class Psearch < Chef::Knife
   :long => "--quiet",
   :description => "Do not print empty attributes.",
   :default => false
+
+  option :count,
+    :short => "-c",
+    :long  => "--count",
+    :description => "Just show the node count when grouping.",
+    :default => false
  
   def run
     @index, @search = @name_args
@@ -68,16 +72,14 @@ class Psearch < Chef::Knife
     results = Chef::PartialSearch.new.search(@index, @search, args_hash)
 
     if (config[:group])
-      groupOutput(results.first)
+      outputResults(groupResults(results.first))
     else
       output results.first
-    end
-  
+      end
   end
 
-  def groupOutput(itemList)
+  def groupResults(itemList)
     attrName = config[:group]
-
     matches = Hash.new {|h,k| h[k] = [] }
     noMatch = Array.new
 
@@ -97,19 +99,14 @@ class Psearch < Chef::Knife
       cnt_matches += 1
 
       if config[:attribute]
-        # Generate a hash with all attributes included in search.
         itemAttributes = Hash.new
 
         item.each do |itemAttr|
           if itemAttr.first != attrName && itemAttr.first != "name"
-
-            if config[:quiet] && itemAttr[1].nil?
-              next
-            end
-
+            (config[:quiet] && itemAttr[1].nil?) && next
             itemAttributes[itemAttr[0]] = itemAttr[1]
           end
-        end 
+        end
 
         matches[attrVal] << { nodeName => itemAttributes }
       else
@@ -117,31 +114,42 @@ class Psearch < Chef::Knife
       end
     end
 
-    ui.msg("Found #{cnt_matches} nodes with #{attrName} attribute set.\n")
-    (config[:no_match] && cnt_noMatch > 0) ? ui.msg("Found #{cnt_noMatch} non-matching nodes.\n") : ""
+    { :attrName   => attrName, :matches    => matches, :noMatch    => noMatch,
+      :matchCnt   => cnt_matches, :noMatchCnt => cnt_noMatch }
+  end
+
+  def outputResults(result)
+    ui.msg("Found #{result[:matchCnt]} nodes with #{result[:attrName]} attribute set.\n")
+
+    !config[:no_match] && result[:noMatchCnt] > 0 &&
+        ui.msg("Found #{result[:noMatchCnt]} non matching nodes.\n")
+
     ui.msg("\n")
 
-    matches.each do |nn|
-      element = Hash.new
+    result[:matches].each do |nn|
+      if config[:count]
+        output({nn.first => result[:matches][nn.first].size})
+        next
+      end
 
       title = "#{nn.first} (#{nn[1].size} node"
       title += nn[1].size > 1 ? "s)" : ")"
-      element[title] = nn
-      element[title].delete_at(0)
 
-      output element
+      output({title => nn.drop(1)})
       ui.msg("\n")
     end
 
-    if config[:no_match] && noMatch.size > 0
-      ui.msg "Non matching nodes: "
-      noMatch.each do |nm|
-        ui.msg nm
+    if !config[:no_match] && result[:noMatchCnt] > 0
+      if config[:count]
+        output ({"Not matching" => result[:noMatchCnt]})
+      else
+        title = "Non matching (#{result[:noMatchCnt]} node"
+        title +=  result[:noMatchCnt] > 1 ? "s)" : ")"
+        output({title => result[:noMatch]})
       end
     end
+  end
 
-end
- 
   def build_key_hash
     key_hash = {}
 
@@ -157,8 +165,6 @@ end
       end
     end
 
-    # This seems like a sane default.  The results without the name
-    # are usually not what we want.
     key_hash["name"] = [ "name" ] unless key_hash.has_key?("name")
     key_hash
   end
