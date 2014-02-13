@@ -10,7 +10,6 @@ class Psearch < Chef::Knife
  
   deps do
     require File.join(File.dirname(__FILE__), 'partial_search.rb')
-    require 'csv'
   end
  
   option :sort,
