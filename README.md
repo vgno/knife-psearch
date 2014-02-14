@@ -31,7 +31,7 @@ Psearch uses the new partial search api included in chef-server 11.
 `knife psearch node "name:*" -g languages.php.version`
 
 
-**Same search, but also include servers which do not have the languages.php.version attribute set**
+**Same search, but do not include servers that don't have the languages.php.version attribute set**
 
   `knife psearch node "name:*" -g languages.php.version -n`
 
