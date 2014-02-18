@@ -59,6 +59,12 @@ class Psearch < Chef::Knife
     :long  => "--count",
     :description => "Just show the node count when grouping.",
     :default => false
+
+  option :id_only,
+    :short  => "-i",
+    :long   => "--id-only",
+    :description => "Show only the ID of matching objects.",
+    :default  => false
  
   def run
     @index, @search = @name_args
@@ -70,11 +76,14 @@ class Psearch < Chef::Knife
     
     results = Chef::PartialSearch.new.search(@index, @search, args_hash)
 
-    if (config[:group])
+    if (config[:id_only] && results.first.length > 0)
+      $stderr.puts "Found #{results.first.length} matches.\n\n"
+      results.first.map { |res| puts res['name'] }
+    elsif (config[:group])
       outputResults(groupResults(results.first))
     else
       output results.first
-      end
+    end
   end
 
   def groupResults(itemList)
@@ -113,8 +122,10 @@ class Psearch < Chef::Knife
       end
     end
 
-    { :attrName   => attrName, :matches    => matches, :noMatch    => noMatch,
-      :matchCnt   => cnt_matches, :noMatchCnt => cnt_noMatch }
+    {
+      :attrName   => attrName, :matches    => matches, :noMatch    => noMatch,
+      :matchCnt   => cnt_matches, :noMatchCnt => cnt_noMatch
+    }
   end
 
   def outputResults(result)
