@@ -1,181 +1,254 @@
 # psearch.rb: A knife plugin for the Partial Search API
-#
-# Note that this is a Beta feature of Opscode Hosted Chef
-# and that it's interface may changed based on user feedback.
-#
-# This plugin is net yet officially supported by Opscode
- 
+# Author: Ole Fredrik Skudsvik <oles@vg.no> 
+
 class Psearch < Chef::Knife
-  banner "knife psearch INDEX SEARCH (Optional: -a attributes)"
- 
-  deps do
-    require File.join(File.dirname(__FILE__), 'partial_search.rb')
-  end
- 
-  option :sort,
-  :short => "-o SORT",
-  :long => "--sort SORT",
-  :description => "The order to sort the results in",
-  :default => nil
- 
-  option :start,
-  :short => "-b ROW",
-  :long => "--start ROW",
-  :description => "The row to start returning results at",
-  :default => 0,
-  :proc => lambda { |i| i.to_i }
- 
-  option :rows,
-  :short => "-R INT",
-  :long => "--rows INT",
-  :description => "The number of rows to return",
-  :default => 1000,
-  :proc => lambda { |i| i.to_i }
- 
-  option :attribute,
-  :short => "-a ATTR",
-  :long => "--attribute ATTR",
-  :description => "Show only one attribute"
+    banner "knife psearch INDEX SEARCH (Optional: -a attributes)"
 
-  option :group,
-  :short => "-g ATTR",
-  :long => "--group ATTR",
-  :description => "Search for nodes with attribute ATTR and group based on it."
-
-  option :no_match,
-  :short => "-n",
-  :long => "--nomatch",
-  :description => "When using -g do not list nodes that does not have the attribute you are grouping on set.",
-  :default => false
-
-  option :quiet,
-  :short => "-q",
-  :long => "--quiet",
-  :description => "Do not print empty attributes.",
-  :default => false
-
-  option :count,
-    :short => "-c",
-    :long  => "--count",
-    :description => "Just show the node count when grouping.",
-    :default => false
-
-  option :id_only,
-    :short  => "-i",
-    :long   => "--id-only",
-    :description => "Show only the ID of matching objects.",
-    :default  => false
- 
-  def run
-    @index, @search = @name_args
-    args_hash = {}
-    args_hash[:keys] = build_key_hash
-    args_hash[:sort] = config[:sort]
-    args_hash[:start] = config[:start]
-    args_hash[:rows] = config[:rows]
-    
-    results = Chef::PartialSearch.new.search(@index, @search, args_hash)
-
-    if (config[:id_only] && results.first.length > 0)
-      $stderr.puts "Found #{results.first.length} matches.\n\n"
-      results.first.map { |res| puts res['name'] }
-    elsif (config[:group])
-      outputResults(groupResults(results.first))
-    else
-      output results.first
+    deps do
+        require File.join(File.dirname(__FILE__), 'partial_search.rb')
+        require 'pp'
     end
-  end
 
-  def groupResults(itemList)
-    attrName = config[:group]
-    matches = Hash.new {|h,k| h[k] = [] }
-    noMatch = Array.new
+    option :sort,
+        :short => "-o SORT",
+        :long => "--sort SORT",
+        :description => "The order to sort the results in",
+        :default => nil
 
-    cnt_matches = 0
-    cnt_noMatch = 0
+    option :start,
+        :short => "-b ROW",
+        :long => "--start ROW",
+        :description => "The row to start returning results at",
+        :default => 0,
+        :proc => lambda { |i| i.to_i }
 
-    itemList.each do |item|
-      attrVal = item[attrName]
-      nodeName = item['name']
+    option :rows,
+        :short => "-R INT",
+        :long => "--rows INT",
+        :description => "The number of rows to return",
+        :default => 1000,
+        :proc => lambda { |i| i.to_i }
 
-      if attrVal.nil?
-        cnt_noMatch += 1
-        noMatch << nodeName
-        next
-      end
+    option :attribute,
+        :short => "-a ATTR",
+        :long => "--attribute ATTR",
+        :description => "Show only one attribute"
 
-      cnt_matches += 1
+    option :group,
+        :short => "-g ATTR",
+        :long => "--group ATTR",
+        :description => "Search for nodes with attribute ATTR and group based on it."
 
-      if config[:attribute]
-        itemAttributes = Hash.new
+    option :no_match,
+        :short => "-n",
+        :long => "--nomatch",
+        :description => "When using -g do not list nodes that does not have the attribute you are grouping on set.",
+        :default => false
 
-        item.each do |itemAttr|
-          if itemAttr.first != attrName && itemAttr.first != "name"
-            (config[:quiet] && itemAttr[1].nil?) && next
-            itemAttributes[itemAttr[0]] = itemAttr[1]
-          end
+    option :quiet,
+        :short => "-q",
+        :long => "--quiet",
+        :description => "Do not print empty attributes.",
+        :default => false
+
+    option :count,
+        :short => "-c",
+        :long  => "--count",
+        :description => "Just show the node count when grouping.",
+        :default => false
+
+    option :id_only,
+        :short  => "-i",
+        :long   => "--id-only",
+        :description => "Show only the ID of matching objects.",
+        :default  => false
+
+    option :compare,
+        :short => "-m attr1:attr2",
+        :long  => "--compare attr1:attr2",
+        :description => "Compare two attributes."
+
+    def printObject data, attrName=nil, indentLevel=1
+        indent = indentLevel.times.collect{}.join(' ')
+
+        if data.is_a?(Hash)
+            data.each do |k,v|
+                if v.is_a?(String)
+                    indent='' if (attrName.nil?)
+                    puts "\e[1;32;40m#{indent} #{k}:\e[0m #{v}"
+                    next
+                else
+                    puts "\e[1;32;40m#{indent}#{k}:\e[0m"
+                    printObject v, k, (indentLevel + 1)
+                end
+            end
+        elsif data.is_a?(Array)
+            data.each do |v|
+                printObject v, nil, indentLevel
+            end
+        else
+            if attrName.nil?
+                puts "\e[1;32;40m#{indent}\e[0m #{data}"
+            else
+                puts "\e[1;32;40m#{indent}#{attrName}:\e[0m #{data}"
+            end
+        end
+    end
+
+    def run
+        @index, @search = (@name_args.size == 1) ? ["node", @name_args.first] : @name_args; 
+        
+        args_hash = {}
+        args_hash[:keys] = build_key_hash
+        args_hash[:sort] = config[:sort]
+        args_hash[:start] = config[:start]
+        args_hash[:rows] = config[:rows]
+
+        results = Chef::PartialSearch.new.search(@index, @search, args_hash)
+
+        if (config[:id_only] && results.first.length > 0)
+            $stderr.puts "Found #{results.first.length} matches.\n\n"
+            results.first.map { |res| puts res['name'] }
+        elsif (config[:group])
+            groupResults results.first
+        elsif config[:compare]
+            compareAttributes(results.first)
+        else
+            printObject results.first
+        end
+    end
+
+    def groupArr arr, props
+        groups = arr.group_by do |x| 
+            if x[props.first].nil?
+                :noMatch
+            else
+                x[props.first]
+            end
         end
 
-        matches[attrVal] << { nodeName => itemAttributes }
-      else
-        matches[attrVal] << nodeName
-      end
+        groups.each do |k,v|
+            v.each do |p|
+                if p.key?('name') && config[:attribute].nil?
+
+                end
+                p.delete(props.first) 
+            end
+        end
+
+        return groups if props.count == 1
+
+        groups.merge(groups) do |group, elements|
+            groupArr(elements, props.drop(1))
+        end
     end
 
-    {
-      :attrName   => attrName, :matches    => matches, :noMatch    => noMatch,
-      :matchCnt   => cnt_matches, :noMatchCnt => cnt_noMatch
-    }
-  end
+    def groupResults(itemList)
+        groupList = config[:group].split(",")
 
-  def outputResults(result)
-    ui.msg("Found #{result[:matchCnt]} nodes with #{result[:attrName]} attribute set.\n")
+        if config[:attribute]
+            groupList << "name"
+        end
 
-    !config[:no_match] && result[:noMatchCnt] > 0 &&
-        ui.msg("Found #{result[:noMatchCnt]} non matching nodes.\n")
+        res = groupArr(itemList, groupList)
+        countMap = getCounts res
+        totalMatching = (countMap.values.inject(:+) - countMap[:noMatch].to_i)
 
-    ui.msg("\n")
+        puts "Found #{totalMatching.to_i} matching nodes."
+        puts "Found #{countMap[:noMatch].to_i} non matching nodes.\n\n"
 
-    result[:matches].each do |nn|
-      if config[:count]
-        output({nn.first => result[:matches][nn.first].size})
-        next
-      end
+        if config[:count]
+            countMap.delete(:noMatch) if config[:no_match]
+            countMap.map { |k,v| puts "#{k}: #{v}" }
+            exit
+        end
 
-      title = "#{nn.first} (#{nn[1].size} node"
-      title += nn[1].size > 1 ? "s)" : ")"
+        res.each do |k, v|
+            next if (k == :noMatch)
+            key = "#{k} (#{countMap[k]} node"
+            key += (countMap.key?(k) && countMap[k] > 1) ? "s)" : ")"
 
-      output({title => nn.drop(1)})
-      ui.msg("\n")
+            printObject( { key => v } )
+            puts "\n"
+        end
+
+        if !config[:no_match] && !res[:noMatch].nil? 
+            printObject({"Non matching (#{countMap[:noMatch].to_i} nodes)" => res[:noMatch]})
+        end
     end
 
-    if !config[:no_match] && result[:noMatchCnt] > 0
-      if config[:count]
-        output ({"Not matching" => result[:noMatchCnt]})
-      else
-        title = "Non matching (#{result[:noMatchCnt]} node"
-        title +=  result[:noMatchCnt] > 1 ? "s)" : ")"
-        output({title => result[:noMatch]})
-      end
-    end
-  end
+    def getCounts arr, countHash = {}, groupName=nil
+        groupList = config[:group].split(",")
 
-  def build_key_hash
-    key_hash = {}
+        arr.each do |x,v|
+            # FIXME: We should not be dependant on checking the groupList parameter.
+            if groupList.size == 1
+                countHash[x] = v.size
+                next
+            end
 
-    if config[:group]
-      key_hash[config[:group]] = config[:group].split(".")
-    end
+            if v.first.kind_of?(Array) # We have a group.
+                getCounts(v, countHash, x)
+                next
+            end
 
-    if config[:attribute]
-      specs = config[:attribute].split(',')
+            if v.kind_of?(Array) && x != "" # We have an entry.
+                countHash[groupName] = countHash.key?(groupName) ? (countHash[groupName] + v.size) : v.size
+            end
+        end
 
-      specs.each do |spc|
-        key_hash[spc] = spc.split(".")
-      end
+        countHash
     end
 
-    key_hash["name"] = [ "name" ] unless key_hash.has_key?("name")
-    key_hash
-  end
+    def compareAttributes(itemList)
+        cmp1, cmp2 = config[:compare].split(':')
+        fail "Usage: -m attr1:attr2" if cmp1.nil? || cmp2.nil?
+
+        matches = Array.new
+        nonMatches = Array.new
+
+        itemList.each do |item|
+
+            if item[cmp1] == item[cmp2]
+                matches << "#{item['name']} (#{item[cmp1]}:#{item[cmp2]})"
+            else
+                nonMatches << "#{item['name']} (#{item[cmp1]}:#{item[cmp2]})"
+
+            end
+        end 
+
+        printObject({ "#{cmp1} == #{cmp2}" => matches })
+        puts
+        printObject({ "#{cmp1} != #{cmp2}" => nonMatches })
+    end
+
+    def build_key_hash
+        key_hash = {}
+
+        if config[:group]
+            config[:group].split(",").each do |k|
+                key_hash[k] = k.split(".")
+            end
+        end
+
+        if config[:attribute]
+            specs = config[:attribute].split(',')
+
+            specs.each do |spc|
+                key_hash[spc] = spc.split(".")
+            end
+        end
+
+        # FIXME: Code duplication.
+        if config[:compare]
+            specs = config[:compare].split(':')
+
+            specs.each do |spc|
+                key_hash[spc] = spc.split(".")
+            end
+        end
+
+        key_hash["name"] = [ "name" ] unless key_hash.has_key?("name")
+        key_hash
+    end
 end
