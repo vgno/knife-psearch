@@ -137,6 +137,7 @@ class Psearch < Chef::Knife
         curItem = Array.new
         attrs.each do |attr|
           str = "\"#{item[attr]}\""
+          str.gsub!(",", " ")
           curItem << str.squeeze(' ')
         end
 
