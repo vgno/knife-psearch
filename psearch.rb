@@ -68,6 +68,11 @@ class Psearch < Chef::Knife
         :long  => "--compare attr1:attr2",
         :description => "Compare two attributes."
 
+    option :csv,
+        :short        => "-s",
+        :long         => "--csv",
+        :description  => "CSV output."
+
     def printObject data, attrName=nil, indentLevel=1
         indent = indentLevel.times.collect{}.join(' ')
 
@@ -113,9 +118,30 @@ class Psearch < Chef::Knife
             groupResults results.first
         elsif config[:compare]
             compareAttributes(results.first)
+        elsif config[:csv]
+            csvOutput results.first
         else
             printObject results.first
         end
+    end
+
+    def csvOutput itemList
+      (itemList.size > 0 && config[:attribute].length > 0) || exit
+
+      attrs = config[:attribute].split(",")
+      attrs.unshift("name")
+
+      puts attrs.join(",")
+      # Data.
+      itemList.each do |item|
+        curItem = Array.new
+        attrs.each do |attr|
+          str = "\"#{item[attr]}\""
+          curItem << str.squeeze(' ')
+        end
+
+        puts curItem.join(",")
+      end
     end
 
     def groupArr arr, props
