@@ -19,7 +19,7 @@
 
 require 'chef/config'
 require 'uri'
-require 'chef/rest'
+require 'chef/server_api'
 # These are needed so that JSON can inflate search results
 require 'chef/node'
 require 'chef/role'
@@ -30,10 +30,10 @@ require 'chef/data_bag_item'
 class Chef
   class PartialSearch
 
-    attr_accessor :rest
+    attr_accessor :serverApi
 
     def initialize(url=nil)
-      @rest = ::Chef::ServerAPI.new(url || ::Chef::Config[:chef_server_url])
+      @serverApi = ::Chef::ServerAPI.new(url || ::Chef::Config[:chef_server_url])
     end
 
     # Search Solr for objects of a given type, for a given query. If you give
@@ -46,10 +46,10 @@ class Chef
       rows = args.include?(:rows) ? args[:rows] : 1000
       query_string = "search/#{type}?q=#{escape(query)}&sort=#{escape(sort)}&start=#{escape(start)}&rows=#{escape(rows)}"
       if args[:keys]
-        response = @rest.post_rest(query_string, args[:keys])
+        response = @serverApi.post_rest(query_string, args[:keys])
         response_rows = response['rows'].map { |row| row['data'] }
       else
-        response = @rest.get_rest(query_string)
+        response = @serverApi.get_rest(query_string)
         response_rows = response['rows']
       end
       if block
@@ -62,7 +62,7 @@ class Chef
             :start => nstart,
             :rows => rows
           }
-          search(type, query, args_hash, &block)  
+          search(type, query, args_hash, &block)
         end
         true
       else
@@ -71,7 +71,7 @@ class Chef
     end
 
     def list_indexes
-      response = @rest.get_rest("search")
+      response = @serverApi.get_rest("search")
     end
 
     private
